@@ -1,0 +1,1076 @@
+# ============================================================================
+# Ricoh Private MIB Specification Part 5 (V4.330, Dec 2024) - NMS reference
+# Solo codigos ME (mercado global).
+#
+# features: derivadas de que contadores expone cada familia en la tabla
+#   original (no son un dato explicito del MIB, es una inferencia util para
+#   decidir que OIDs consultar por SNMP):
+#     color         -> existe contador "Total Prints: Color"
+#     multifunction -> existe contador de copiadora (no es printer-only)
+#     scanner       -> existe contador "Scanned Pages: Total" (solo 7 familias
+#                       del motor "IM": ME064,ME068,ME070,ME072,ME073,ME077,ME078)
+#     toner         -> "color" (CMYK) o "mono" (solo negro)
+#
+# counters: total_black, total_color (si color=true), total_scan (si scanner=true)
+#   OIDs de Table 3.2.1.2.19.5.1.1 (paginas 135-263)
+#
+# NOTA SOBRE total_scan (paginas por ADF):
+#   Este MIB NO distingue ADF vs cristal. "Scanned Pages: Total" suma TODO
+#   el volumen de escaneo, cualquier via, cualquier aplicacion.
+#
+# NOTA SOBRE total_black EN MAQUINAS MONOCROMO:
+#   Si no hay contador dedicado "Total Prints: Black & White", total_black
+#   usa "Counter: Machine Total" (equivalente, toda la produccion es B/N).
+#
+# NOTA SOBRE CONSUMIBLES (aplica a todas las familias):
+#   toner_level (OID .../3.2.1.2.24.1.1.5.<indice>) es PORCENTAJE restante
+#   (0-100; -100="casi vacio"; -2="no medible"), NO contador actual/maximo.
+#   Tambor, correa de transferencia, fusor y toner residual NO estan en este
+#   documento -> ver standard_mib_references mas abajo.
+#
+# "ME061" no existe en este documento (salta de ME060 a ME062).
+# ============================================================================
+
+# ============================================================================
+# IDENTIFICACION DEL EQUIPO (objetos genericos, MISMO OID para toda la gama).
+# Fuente: 3.2.1.1.ricohSysGeneral / 3.2.1.2.ricohEngDescr / 3.2.1.6.ricohNetCont
+# ============================================================================
+device_identification:
+  model_name:
+    oid: .1.3.6.1.4.1.367.3.2.1.1.1.1.0
+    description: 'Nombre de modelo, limpio (ricohSysName). Ejemplo: "IM C5510"'
+  display_name:
+    oid: .1.3.6.1.4.1.367.3.2.1.6.1.1.7.1
+    description: 'Nombre tal como aparece en panel/web del equipo, incluye marca (ricohNetContPrinterName). Ejemplo: "RICOH IM C5510." Editable por el administrador del equipo, no garantizado al 100%.'
+  serial_number:
+    oid: .1.3.6.1.4.1.367.3.2.1.2.1.4.0
+    description: Numero de serie del motor de impresion (ricohEngSerialNumber)
+  note: 'La marca es siempre "Ricoh" (fabricante fijo, no hay OID para ello); si necesitas el campo separado, hardcodealo en la aplicacion en vez de parsear display_name.'
+
+# ============================================================================
+# ESTADO / ALERTAS (objetos genericos, MISMO OID para toda la gama; NO
+# dependen de la familia). La disponibilidad real varia por modelo - si el
+# equipo no soporta un objeto, el GET SNMP devuelve noSuchObject/noSuchInstance;
+# el poller debe capturarlo y simplemente omitir esa metrica para ese equipo,
+# no es un error de configuracion.
+#
+# Cada objeto es un entero de 32 bits usado como bitmask: 1 = condicion activa.
+# Fuente: 3.2.1.2.2.ricohEngStatus
+# ============================================================================
+status:
+  copier_status:
+    oid: .1.3.6.1.4.1.367.3.2.1.2.2.22.0
+    description: Estado resumen de la aplicacion copiadora (ricohEngCopyStatSummary)
+    bits:
+      0: alert_other
+      1: alert_toner_low
+      2: alert_occupied
+      3: alert_warmup
+      4: error_other
+      5: error_scanner_cover_open
+      6: error_plotter_cover_open
+      7: error_paper_end
+      8: error_scanner_paper_jam
+      9: error_plotter_paper_jam
+      10: error_toner_end
+      11: service_call
+  scan_status:
+    oid: .1.3.6.1.4.1.367.3.2.1.2.2.18.0
+    description: Estado resumen de la aplicacion escaner (ricohEngScanStatSummary)
+    bits:
+      0: paper_on_contact_glass
+      1: adf_lift_up
+      2: adf_jam
+      3: adf_cover_open
+      4: error_other
+      5: user_maintenance
+      6: service_call
+      7: power_off
+      8: occupied
+      9: alert_other
+
+# ============================================================================
+# REFERENCIAS A STANDARD PRINTER MIB (RFC1759 / RFC3805) - NO son objetos de
+# Ricoh Private MIB, pero se documentan aqui porque este MIB remite
+# explicitamente a ellos para bandejas de papel y consumibles fisicos.
+# Son estandar SNMP: funcionan igual en impresoras de cualquier fabricante.
+# Ambas tablas se indexan por hrDeviceIndex + indice de fila (prtInputIndex /
+# prtMarkerSuppliesIndex), hay que recorrerlas con GETNEXT/WALK, no son OIDs
+# escalares directos.
+# ============================================================================
+standard_mib_references:
+  paper_tray_level:
+    current_level_oid: .1.3.6.1.2.1.43.8.2.1.10   # prtInputCurrentLevel
+    max_capacity_oid: .1.3.6.1.2.1.43.8.2.1.9     # prtInputMaxCapacity
+    description_oid: .1.3.6.1.2.1.43.8.2.1.18     # prtInputDescription (nombre de la bandeja)
+  physical_supplies:
+    current_level_oid: .1.3.6.1.2.1.43.11.1.1.9   # prtMarkerSuppliesLevel
+    max_capacity_oid: .1.3.6.1.2.1.43.11.1.1.8    # prtMarkerSuppliesMaxCapacity
+    description_oid: .1.3.6.1.2.1.43.11.1.1.6     # prtMarkerSuppliesDescription
+    note: "Tambor, fusor, correa de transferencia, toner residual. El campo description_oid indica que consumible es cada fila (texto libre del fabricante)."
+
+
+ME001:
+  features:
+    color: false
+    multifunction: false
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME002:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME003:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME004:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME005:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME008:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME009:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME010:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME011:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME013:
+  features:
+    color: false
+    multifunction: false
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME014:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME015:
+  features:
+    color: false
+    multifunction: false
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME016:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME021:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME022:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME025:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME027:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME029:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME030:
+  features:
+    color: false
+    multifunction: false
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME031:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME033:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME034:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME035:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME036:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME038:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME039:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME040:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME045:
+  features:
+    color: false
+    multifunction: false
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME046:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME047:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME051:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME052:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME053:
+  features:
+    color: false
+    multifunction: false
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME056:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME057:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME058:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME059:
+  features:
+    color: false
+    multifunction: false
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME060:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME062:
+  features:
+    color: true
+    multifunction: true
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME063:
+  features:
+    color: false
+    multifunction: true
+    scanner: false
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME064:
+  features:
+    color: false
+    multifunction: true
+    scanner: true
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+    total_scan:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.168
+      description: 'Total de paginas escaneadas (todas las fuentes: ADF + cristal, todas las aplicaciones)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME068:
+  features:
+    color: true
+    multifunction: true
+    scanner: true
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+    total_scan:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.432
+      description: 'Total de paginas escaneadas (todas las fuentes: ADF + cristal, todas las aplicaciones)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME070:
+  features:
+    color: false
+    multifunction: true
+    scanner: true
+    toner: mono
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.1
+      description: 'Total de impresiones en blanco y negro (equivale a Counter: Machine Total, maquina
+        monocromo)'
+    total_scan:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.168
+      description: 'Total de paginas escaneadas (todas las fuentes: ADF + cristal, todas las aplicaciones)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+ME071:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME072:
+  features:
+    color: true
+    multifunction: true
+    scanner: true
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+    total_scan:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.432
+      description: 'Total de paginas escaneadas (todas las fuentes: ADF + cristal, todas las aplicaciones)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME073:
+  features:
+    color: true
+    multifunction: true
+    scanner: true
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+    total_scan:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.351
+      description: 'Total de paginas escaneadas (todas las fuentes: ADF + cristal, todas las aplicaciones)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME074:
+  features:
+    color: true
+    multifunction: false
+    scanner: false
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.14
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.13
+      description: Total de impresiones a color
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME077:
+  features:
+    color: true
+    multifunction: true
+    scanner: true
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+    total_scan:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.351
+      description: 'Total de paginas escaneadas (todas las fuentes: ADF + cristal, todas las aplicaciones)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4
+ME078:
+  features:
+    color: true
+    multifunction: true
+    scanner: true
+    toner: color
+  counters:
+    total_black:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.22
+      description: Total de impresiones en blanco y negro
+    total_color:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.21
+      description: Total de impresiones a color
+    total_scan:
+      oid: .1.3.6.1.4.1.367.3.2.1.2.19.5.1.9.432
+      description: 'Total de paginas escaneadas (todas las fuentes: ADF + cristal, todas las aplicaciones)'
+  consumables:
+    toner_level:
+      black:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.1
+      cyan:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.2
+      magenta:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.3
+      yellow:
+        oid: .1.3.6.1.4.1.367.3.2.1.2.24.1.1.5.4

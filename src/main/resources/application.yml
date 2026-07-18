@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: nms-printer-monitor
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/nms_printers
+    username: nms_user
+    password: nms_pass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: 8080
+
+nms:
+  snmp:
+    community: public
+    timeout: 3000
+    retries: 2
+    version: v2c
+  discovery:
+    concurrent-ips: 50
+    ping-timeout: 2000

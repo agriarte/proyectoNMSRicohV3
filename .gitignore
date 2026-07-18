@@ -1,0 +1,44 @@
+### Maven ###
+target/
+
+### Maven Wrapper ###
+!/mvnw
+!/mvnw.cmd
+
+### Eclipse ###
+.classpath
+.project
+.settings/
+.metadata/
+.factorypath
+.springBeans
+bin/
+
+### IntelliJ IDEA ###
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+### Gradle ###
+.gradle/
+
+### Logs ###
+logs/
+*.log
+*.log.*
+
+### Sistema operativo ###
+.DS_Store
+Thumbs.db
+
+### Bases de datos embebidas ###
+*.h2.db
+*.mv.db
+
+### Configuración local (no versionar si contiene datos sensibles) ###
+application-local.properties
+application-local.yml
+application-prod.properties
+application-prod.yml

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NMS Printer Monitor</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --accent: #38bdf8;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --border: #334155;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        header {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        header h1 { font-size: 1.4rem; font-weight: 600; }
+        header h1::before { content: "🖨️"; }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+        .controls {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .controls label { color: var(--muted); font-size: 0.9rem; }
+        .controls input {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            color: var(--text);
+            font-size: 0.95rem;
+            width: 140px;
+        }
+        .controls input:focus { outline: none; border-color: var(--accent); }
+        .controls input.invalid { border-color: var(--danger); }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-primary { background: var(--accent); color: #0f172a; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-secondary { background: var(--border); color: var(--text); }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 0.75rem;
+            display: none;
+        }
+        .progress-bar.active { display: block; }
+        .progress-bar .fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .stat-card {
+            background: var(--card);
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .stat-card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
+        .stat-card .value { font-size: 1.75rem; font-weight: 700; margin-top: 0.25rem; }
+        .stat-card.total .value { color: var(--accent); }
+        .stat-card.found .value { color: var(--success); }
+        .stat-card.unsupported .value { color: var(--warning); }
+
+        .table-container {
+            background: var(--card);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        thead { background: rgba(56, 189, 248, 0.1); }
+        th {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            border-bottom: 1px solid var(--border);
+        }
+        td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+        tr:hover { background: rgba(255,255,255,0.03); }
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .badge.found { background: rgba(74, 222, 128, 0.15); color: var(--success); }
+        .badge.unsupported { background: rgba(251, 191, 36, 0.15); color: var(--warning); }
+        .ip-cell { font-family: 'SF Mono', monospace; font-size: 0.85rem; color: var(--muted); }
+        .toner-bar {
+            display: flex;
+            gap: 2px;
+            height: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .toner-bar span { height: 100%; }
+        .toner-k { background: #333; }
+        .toner-c { background: #06b6d4; }
+        .toner-m { background: #ec4899; }
+        .toner-y { background: #eab308; }
+
+        .log {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: 'SF Mono', monospace;
+            font-size: 0.8rem;
+            max-height: 240px;
+            overflow-y: auto;
+            color: var(--muted);
+        }
+        .log .entry { padding: 0.2rem 0; border-bottom: 1px solid var(--border); }
+        .log .entry:last-child { border-bottom: none; }
+        .log .time { color: #64748b; margin-right: 0.5rem; }
+        .log .probing { color: var(--muted); }
+        .log .found { color: var(--success); }
+        .log .unsupported { color: var(--warning); }
+        .log .info { color: var(--accent); }
+        .log .error { color: var(--danger); }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--muted);
+        }
+        .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>NMS Printer Monitor</h1>
+    </header>
+
+    <div class="container">
+        <div class="controls">
+            <label for="subnet">Red:</label>
+            <input type="text" id="subnet" placeholder="192.168.1" value="192.168.1">
+            <button id="btnScan" class="btn btn-primary" onclick="startScan()">🔍 Escanear</button>
+            <button id="btnStop" class="btn btn-danger" onclick="stopScan()" disabled>⏹️ Detener</button>
+            <button id="btnClear" class="btn btn-secondary" onclick="clearResults()">🗑️ Limpiar</button>
+            <div class="progress-bar" id="progressBar">
+                <div class="fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-card total">
+                <div class="label">Sondeados</div>
+                <div class="value" id="statTotal">0</div>
+            </div>
+            <div class="stat-card found">
+                <div class="label">Soportados</div>
+                <div class="value" id="statFound">0</div>
+            </div>
+            <div class="stat-card unsupported">
+                <div class="label">No soportados</div>
+                <div class="value" id="statUnsupported">0</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>IP</th>
+                        <th>Estado</th>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Familia</th>
+                        <th>Contadores</th>
+                        <th>Toner</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody">
+                    <tr class="empty-state">
+                        <td colspan="7">
+                            <div class="icon">📡</div>
+                            <p>Introduce una subred y pulsa "Escanear"</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="log" id="log">
+            <div class="entry"><span class="time">--:--:--</span> Esperando inicio de escaneo...</div>
+        </div>
+    </div>
+
+    <script>
+        let evtSource = null;
+        let totalScanned = 0;
+        let foundCount = 0;
+        let unsupportedCount = 0;
+        let startTime = null;
+        let totalHosts = 254; // valor por defecto para un /24; se sobreescribe si el backend lo indica en START
+
+        document.getElementById('subnet').addEventListener('input', function() {
+            const value = this.value.trim();
+            if (value === '' || isValidSubnet(value)) {
+                this.classList.remove('invalid');
+            } else {
+                this.classList.add('invalid');
+            }
+        });
+
+        function isValidSubnet(subnet) {
+            // Exactamente 3 octetos numericos (0-255) separados por puntos, ej: 192.168.1
+            const parts = subnet.split('.');
+            if (parts.length !== 3) return false;
+            return parts.every(part => {
+                if (!/^\d{1,3}$/.test(part)) return false;
+                const n = parseInt(part, 10);
+                return n >= 0 && n <= 255;
+            });
+        }
+
+        function startScan() {
+            const subnet = document.getElementById('subnet').value.trim();
+     
+            if (!isValidSubnet(subnet)) {
+            	alert('Introduce una subred valida: 3 octetos numericos (0-255) separados por puntos, ej: 192.168.1');
+                return;
+            }
+
+            stopScan();
+            clearResults(false);
+
+            document.getElementById('btnScan').disabled = true;
+            document.getElementById('btnStop').disabled = false;
+            document.getElementById('progressBar').classList.add('active');
+            document.getElementById('progressFill').style.width = '0%';
+
+            totalHosts = 254;
+            startTime = Date.now();
+            log('Iniciando escaneo de ' + subnet + '.0/24...', 'info');
+
+            evtSource = new EventSource('/api/discovery/stream?subnet=' + encodeURIComponent(subnet));
+
+            evtSource.onopen = () => {
+                log('Conexion SSE establecida', 'info');
+            };
+
+            evtSource.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                handleEvent(data);
+            };
+
+            evtSource.onerror = (e) => {
+                log('Conexion cerrada o error de red', 'info');
+                if (evtSource) {
+                    evtSource.close();
+                    evtSource = null;
+                }
+                finishScan();
+            };
+        }
+
+        function handleEvent(data) {
+            const event = data.event;
+
+            if (event === 'START') {
+                // Si el backend indica el numero real de hosts a sondear, lo usamos
+                totalHosts = data.totalHosts || totalHosts;
+                log('Scan iniciado a las ' + data.time, 'info');
+                return;
+            }
+
+            if (event === 'PROBING') {
+                log('🔍 ' + data.ip + ' ...', 'probing');
+                updateProgressFromIp(data.ip);
+                return;
+            }
+
+            if (event === 'FOUND') {
+                totalScanned++;
+                foundCount++;
+                updateStats();
+                addDeviceRow(data, 'found');
+                log('✅ ' + data.ip + ' → ' + data.modelName + ' (' + data.familyCode + ')', 'found');
+                updateProgressFromIp(data.ip);
+                return;
+            }
+
+            if (event === 'UNSUPPORTED') {
+                totalScanned++;
+                unsupportedCount++;
+                updateStats();
+                addDeviceRow(data, 'unsupported');
+                log('⚠️ ' + data.ip + ' → ' + data.sysDescr, 'unsupported');
+                updateProgressFromIp(data.ip);
+                return;
+            }
+
+            if (event === 'COMPLETE') {
+                log('🏁 Escaneo completado a las ' + data.time, 'info');
+                if (evtSource) {
+                    evtSource.close();
+                    evtSource = null;
+                }
+                finishScan();
+                return;
+            }
+        }
+
+        function updateProgressFromIp(ip) {
+            const lastOctet = parseInt(ip.split('.').pop(), 10);
+            if (!isNaN(lastOctet)) {
+                const progress = Math.min(99, (lastOctet / totalHosts) * 100);
+                document.getElementById('progressFill').style.width = progress + '%';
+            }
+        }
+
+        function addDeviceRow(data, statusClass) {
+            const tbody = document.getElementById('resultsBody');
+            if (tbody.querySelector('.empty-state')) {
+                tbody.innerHTML = '';
+            }
+
+            const tr = document.createElement('tr');
+
+            let counters = '-';
+            if (data.totalBlack !== undefined) {
+                counters = 'B/N: ' + data.totalBlack?.toLocaleString() || '0';
+                if (data.totalColor !== undefined && data.totalColor !== null) {
+                    counters += ' | Color: ' + data.totalColor.toLocaleString();
+                }
+                if (data.totalScan !== undefined && data.totalScan !== null) {
+                    counters += ' | Scan: ' + data.totalScan.toLocaleString();
+                }
+            }
+
+            let tonerHtml = '-';
+            if (data.tonerBlack !== undefined) {
+                const k = data.tonerBlack || 0;
+                const c = data.tonerCyan || 0;
+                const m = data.tonerMagenta || 0;
+                const y = data.tonerYellow || 0;
+                tonerHtml = `
+                    <div style="font-size:0.75rem;color:var(--muted)">
+                        K:${k}% C:${c}% M:${m}% Y:${y}%
+                    </div>
+                    <div class="toner-bar">
+                        <span class="toner-k" style="width:${k}%"></span>
+                        <span class="toner-c" style="width:${c}%"></span>
+                        <span class="toner-m" style="width:${m}%"></span>
+                        <span class="toner-y" style="width:${y}%"></span>
+                    </div>
+                `;
+            }
+
+            tr.innerHTML = `
+                <td class="ip-cell">${data.ip}</td>
+                <td><span class="badge ${statusClass}">${eventLabel(statusClass)}</span></td>
+                <td>${data.brand || '-'}</td>
+                <td>${data.modelName || '-'}</td>
+                <td><code>${data.familyCode || '-'}</code></td>
+                <td>${counters}</td>
+                <td>${tonerHtml}</td>
+            `;
+            tbody.insertBefore(tr, tbody.firstChild);
+        }
+
+        function eventLabel(status) {
+            return status === 'found' ? 'SOPORTADO' : 'NO SOPORTADO';
+        }
+
+        function updateStats() {
+            document.getElementById('statTotal').textContent = totalScanned;
+            document.getElementById('statFound').textContent = foundCount;
+            document.getElementById('statUnsupported').textContent = unsupportedCount;
+        }
+
+        function stopScan() {
+            if (evtSource) {
+                evtSource.close();
+                evtSource = null;
+            }
+            finishScan();
+        }
+
+        function finishScan() {
+            document.getElementById('btnScan').disabled = false;
+            document.getElementById('btnStop').disabled = true;
+            document.getElementById('progressBar').classList.remove('active');
+            document.getElementById('progressFill').style.width = '100%';
+        }
+
+        function clearResults(resetStats = true) {
+            document.getElementById('resultsBody').innerHTML = `
+                <tr class="empty-state">
+                    <td colspan="7">
+                        <div class="icon">📡</div>
+                        <p>Introduce una subred y pulsa "Escanear"</p>
+                    </td>
+                </tr>
+            `;
+            if (resetStats) {
+                totalScanned = 0;
+                foundCount = 0;
+                unsupportedCount = 0;
+                updateStats();
+                document.getElementById('log').innerHTML = '<div class="entry"><span class="time">--:--:--</span> Resultados limpiados</div>';
+            }
+        }
+
+        function log(message, type = '') {
+            const logEl = document.getElementById('log');
+            const now = new Date();
+            const time = now.toTimeString().split(' ')[0];
+            const entry = document.createElement('div');
+            entry.className = 'entry';
+            entry.innerHTML = `<span class="time">${time}</span><span class="${type}">${message}</span>`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+    </script>
+</body>
+</html>

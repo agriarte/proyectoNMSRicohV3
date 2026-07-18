@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/nms_printers
+      - SPRING_DATASOURCE_USERNAME=nms_user
+      - SPRING_DATASOURCE_PASSWORD=nms_pass
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - NMS_SNMP_COMMUNITY=public
+      - NMS_SNMP_TIMEOUT=3000
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - nms-network
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=nms_printers
+      - POSTGRES_USER=nms_user
+      - POSTGRES_PASSWORD=nms_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nms_user -d nms_printers"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nms-network
+
+  # Grafana para la siguiente version (preparado)
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      # En la siguiente version montaremos dashboards personalizados:
+      # - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      # - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - nms-network
+    profiles:
+      - monitoring  # No arranca por defecto, usar: docker compose --profile monitoring up
+
+volumes:
+  postgres_data:
+  grafana_data:
+
+networks:
+  nms-network:
+    driver: bridge

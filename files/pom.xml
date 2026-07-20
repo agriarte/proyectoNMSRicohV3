@@ -21,7 +21,6 @@
     <properties>
         <java.version>21</java.version>
         <snmp4j.version>3.7.7</snmp4j.version>
-        <testcontainers.version>1.20.0</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -73,13 +72,13 @@
             <optional>true</optional>
         </dependency>
 
-               <!-- Test -->
+        <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
- 
+
         <!-- Testcontainers: Postgres real para tests de persistencia -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -96,7 +95,6 @@
             <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
-
     </dependencies>
 
     <build>

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build: .
@@ -54,9 +52,26 @@ services:
     profiles:
       - monitoring  # No arranca por defecto, usar: docker compose --profile monitoring up
 
+  #pgadmin
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      - "8090:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - nms-network  
+
 volumes:
   postgres_data:
   grafana_data:
+  pgadmin_data:  
 
 networks:
   nms-network:

@@ -3,6 +3,9 @@ package com.tuempresa.nms.infrastructure.persistence;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 @Entity
 @Table(name = "readings", indexes = {
     @Index(name = "idx_reading_device_time", columnList = "device_id, polled_at")
@@ -29,10 +32,12 @@ public class ReadingEntity {
     private Integer tonerMagentaPercent;
     private Integer tonerYellowPercent;
 
-    @Column(columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "alerts_json", columnDefinition = "jsonb")
     private String alertsJson;
 
-    @Column(columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_oids_json", columnDefinition = "jsonb")
     private String rawOidsJson;
 
     // Getters y setters

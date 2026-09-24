@@ -102,7 +102,9 @@ public class Snmp4jClient implements SnmpClient {
                 if (event != null && event.getResponse() != null) {
                     PDU resp = event.getResponse();
                     for (VariableBinding vb : resp.getVariableBindings()) {
-                        String oid = vb.getOid().toString();
+                        String oid = vb.getOid().toString();  // <-- OJO!!!! SNMP4J devuelve "1.3.6.1.4.1...." SIN punto inicial
+                        // Dará error porque la búsqueda es con el punto inicial. Debe normalizarse
+                        
                         String val = vb.getVariable() instanceof Null ? null : vb.getVariable().toString();
                         response.putScalar(oid, val);
                     }

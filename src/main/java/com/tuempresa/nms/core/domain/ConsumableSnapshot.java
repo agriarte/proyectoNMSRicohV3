@@ -4,6 +4,7 @@ public record ConsumableSnapshot(
     Integer tonerBlackPercent,
     Integer tonerCyanPercent,
     Integer tonerMagentaPercent,
-    Integer tonerYellowPercent
+    Integer tonerYellowPercent,
+    Integer wasteTonerPercent
 ) {
 }

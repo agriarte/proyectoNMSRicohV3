@@ -10,7 +10,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     show-sql: false
     properties:
       hibernate:
@@ -23,9 +23,9 @@ server:
 nms:
   snmp:
     community: public
-    timeout: 3000
+    timeout: 1000
     retries: 2
     version: v2c
   discovery:
-    concurrent-ips: 50
+    concurrent-ips: 300
     ping-timeout: 2000

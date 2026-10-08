@@ -329,6 +329,9 @@
             }
 
             if (event === 'FOUND') {
+
+            	console.log(data)
+            	
                 totalScanned++;
                 foundCount++;
                 updateStats();
@@ -387,20 +390,24 @@
             }
 
             let tonerHtml = '-';
-            if (data.tonerBlack !== undefined) {
-                const k = data.tonerBlack || 0;
-                const c = data.tonerCyan || 0;
-                const m = data.tonerMagenta || 0;
-                const y = data.tonerYellow || 0;
+            const tonerValues = [data.tonerBlack, data.tonerCyan, data.tonerMagenta, data.tonerYellow];
+            const hasAnyToner = tonerValues.some(v => v !== undefined && v !== null);
+
+            if (hasAnyToner) {
+                const label = v => (v === undefined || v === null) ? 'N/D' : v + '%';
+                const width = v => (v === undefined || v === null) ? 0 : v;
+
+                const k = data.tonerBlack, c = data.tonerCyan, m = data.tonerMagenta, y = data.tonerYellow;
+
                 tonerHtml = `
                     <div style="font-size:0.75rem;color:var(--muted)">
-                        K:${k}% C:${c}% M:${m}% Y:${y}%
+                        K:${label(k)} C:${label(c)} M:${label(m)} Y:${label(y)}
                     </div>
                     <div class="toner-bar">
-                        <span class="toner-k" style="width:${k}%"></span>
-                        <span class="toner-c" style="width:${c}%"></span>
-                        <span class="toner-m" style="width:${m}%"></span>
-                        <span class="toner-y" style="width:${y}%"></span>
+                        <span class="toner-k" style="width:${width(k)}%"></span>
+                        <span class="toner-c" style="width:${width(c)}%"></span>
+                        <span class="toner-m" style="width:${width(m)}%"></span>
+                        <span class="toner-y" style="width:${width(y)}%"></span>
                     </div>
                 `;
             }

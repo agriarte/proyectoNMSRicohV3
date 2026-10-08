@@ -129,27 +129,20 @@ public class DiscoveryService {
 				tasks.add(task);
 			}
 
-			boolean finished;
+			boolean finished = true;
 
 			try {
-
 				CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0])).get(3, TimeUnit.MINUTES);
-
-				finished = true;
-
 			} catch (java.util.concurrent.TimeoutException te) {
-
 				finished = false;
-
 				log.warn("El escaneo de {} no terminó en 3 minutos", subnet);
+				pool.shutdownNow(); // interrumpe las tareas que sigan vivas
 			}
 
-			if (!finished) {
-
-				log.warn("Algunas tareas no terminaron a tiempo");
-			}
-
-			sendEvent(emitter, Map.ofEntries(Map.entry("event", "COMPLETE"), Map.entry("time", LocalTime.now())));
+			// COMPLETE si terminó todo; TIMEOUT si se cortó por tiempo
+			sendEvent(emitter, Map.ofEntries(
+					Map.entry("event", finished ? "COMPLETE" : "TIMEOUT"),
+					Map.entry("time", LocalTime.now())));
 
 			emitter.complete();
 
